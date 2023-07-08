@@ -10,15 +10,13 @@ Moreover package-lock.json and package.json holds information on the dependencie
 
 # Dependencies of the Project:
 "dependencies": {
-    "browser-image-compression": "^1.0.12",
-    "express": "^4.17.1",
-    "jquery": "^3.5.1",
-    "nodemon": "^2.0.4",
-    "socket.io": "^2.5.0"
-  }
+"browser-image-compression": "^1.0.12",
+"express": "^4.17.1",
+"jquery": "^3.5.1",
+"nodemon": "^2.0.4",
+"socket.io": "^2.5.0"
+}
 
-
-![Screenshot (447)](https://github.com/ydvhemant0506/Chat_Messanger/assets/113281222/b585522d-ec3f-4558-9b5f-5afbbbc21f9f)
 
 
   
