@@ -1,0 +1,204 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="https://www.freepngimg.com/download/chat/12-2-chat-png.png" type="image/gif" sizes="16x16">
+  <script type="text/javascript" src="/node_modules//browser-image-compression//dist/browser-image-compression.js" defer="defer"></script>
+  <title>ChatPat</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+
+  </style>
+</head>
+
+<body>
+
+  <!-- This Overlay is the Entry point of user before accessing the ChatPat and Entering the room. User has to submit the unique username. -->
+  <div id="overlay">
+    <div>
+      <img src="images/favicon.png" alt="Reloading" style = "height:135px; width:155px; display:block; margin: 80px auto;">
+      <span><h1>Hi Welcome ChatPat, World's Famous Chatting App</h1></span>
+    </div>
+    <div class="inner">
+      <input type="text" id="user" autocomplete="off" placeholder="Enter username"><button
+        id="senduser">Start Chatting</button>
+    </div>
+  </div>
+
+  <!-- This ul tag basically stores all the messages and media shared by users in the form of list items appended one after the other. -->
+  <ul id="messages"></ul>
+
+  <!-- This is basically the container which Takes either input as text message of some media files to send all the other users connected -->
+  <div>
+    <form action="" style="display: flex; flex-direction: row; justify-content: center; align-items: center; background-color: #6195edad; border:3px solid black;border-radius: 7px;">
+      <!-- <div id="feedback"></div> -->
+      <div style="display: flex; width:320px">
+        <label for="uploadfile"><span style="color: rgb(1, 1, 1); margin-top:5px">Choose any File If you wanna Transfer</span>
+          <input type="file" id="uploadfile" style="width:200px" />
+        </label>
+        <span id="progress">uploading: <span id="percentage"></span> %</span>
+      </div>
+  
+      <input id="m" autocomplete="off" placeholder="Type Your message" style = "width: 1000px; height: 55px; border: 1px solid black; border-radius:10px; margin-top:5px" />
+      <button style = "width:110px; height: 46px; border-radius:10px; margin-top:5px">Send</button>
+    </form>
+  </div>
+  <!-- The Modal -->
+  <div id="myModal" class="modal">
+
+    <!-- The Close Button -->
+    <span class="close">&times;</span>
+
+    <!-- Modal Content (The Image) -->
+    <img class="modal-content" id="img01">
+
+    <!-- Modal Caption (Image Text) -->
+    <div id="caption"></div>
+  </div>
+</body>
+
+<!-- Below are the script files -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="/node_modules//jquery/dist/jquery.min.js"></script>
+<script>
+  var audio = new Audio('ting.mp3')
+  $(function () {
+    var socket = io();
+    var username = $('#user');
+    var senduser = $('#senduser');
+
+    $('form').submit(function (e) {
+      e.preventDefault(); // prevents page reloading
+      socket.emit('chat message', $('#m').val());//Sending Message
+      $('#m').val('');//Again making the container "#m" empty.
+      return false;
+    });
+
+    socket.on('chat message', function (msg) {
+      $('#messages').append($('<li>').html(msg));
+      audio.play()
+    });
+
+
+    socket.on('left', name => {
+      $('#messages').append($('<li>').html(name + " leave the Chat Room"));
+      audio.play()
+    });
+  
+    senduser.click(function () {
+      console.log(username.val());
+      socket.emit("change_username", { username: username.val() })
+      // hiding Overplay After Clicking on Enter Chat Button
+      $('#overlay').hide();
+    })
+
+    $('#m').bind("keypress", () => {
+      $("html, body").animate({ scrollTop: $('#messages').height() }, 100);
+      socket.emit('typing');
+    })
+
+    $('#m').keyup(function () {
+      socket.emit('stop typing');
+    });
+
+
+    socket.on('typing', (data) => {
+      $('#feedback').fadeIn();
+      $('#feedback').html("<p><i>" + data.username + " is typing a message...." + "</i></p>");
+    })
+
+    socket.on('stop typing', (data) => {
+      setTimeout($('#feedback').fadeOut(), 1000);
+    })
+
+    $('#uploadfile').bind('change', async function (event) {
+      
+        const imageFile = event.target.files[0];
+        console.log('originalFile instanceof Blob', imageFile instanceof Blob); // true
+        console.log(`originalFile size ${imageFile.size / 1024 / 1024} MB`);
+
+        const options = {
+          maxSizeMB: 0.2,
+          maxWidthOrHeight: 600,
+          useWebWorker: true
+        }
+        try {
+          const compressedFile = await imageCompression(imageFile, options);
+          console.log('compressedFile instanceof Blob', compressedFile instanceof Blob); // true
+          console.log(`compressedFile size ${compressedFile.size / 1024 / 1024} MB`); // smaller than maxSizeMB
+
+          await readThenSendFile(compressedFile); //readin the compressed file
+        } catch (error) {
+          console.log(error);
+          await readThenSendFile(imageFile); // if filetype is not image then sent orignal data without compression
+        }
+
+    });
+
+    function readThenSendFile(data) {
+
+      //show progress msg
+      $('#progress').fadeIn(100);
+
+      var reader = new FileReader();
+      reader.onload = function (evt) {
+        var msg = {};
+        msg.username = username;
+        msg.file = evt.target.result;
+        msg.fileName = data.name;
+        socket.emit('base64 file', msg);
+      };
+      reader.readAsDataURL(data);
+
+      reader.onprogress = function (currentFile) {
+        if (currentFile.lengthComputable) {
+          var progress = parseInt(((currentFile.loaded / currentFile.total) * 100), 10);
+          $('#percentage').html(progress);
+          console.log(progress);
+        }
+      }
+      reader.onerror = function () {
+        alert("Could not read the file: large file size");
+      };
+    }
+
+    socket.on('base64 file', (data) => {
+      //hide progress msg when data received
+      $('#progress').hide();
+      //appending data according to data types
+      let filetype = data.fileName.split('.').pop();
+      if (filetype == 'mp4' || filetype == 'ogg' || filetype == 'mkv') {
+        $('#messages').append($('<li>').html(`<p class="username">${data.username}:</p><video class="imgupload" src="${data.file}" height="400" width="400" controls/>`));
+        audio.play();
+      } else if (filetype == 'mp3' || filetype == 'wav' || filetype == 'aac') {
+        $('#messages').append($('<li>').html(`<p class="username">${data.username}:</p><audio class="imgupload" src="${data.file}" height="400" width="400" controls/>`));
+        audio.play();
+      } else {
+        $('#messages').append($('<li>').html(`<p class="username">${data.username}:</p><img class="imgupload" src="${data.file}" height="200" width="200" onclick="showimg(this)"/>`));
+        audio.play();
+      }
+    })
+
+  });
+
+  // Get the modal
+  var modal = document.getElementById("myModal");
+
+  // Get the image and insert it inside the modal - use its "alt" text as a caption
+  function showimg(data) {
+    var img = data;
+    var modalImg = document.getElementById("img01");
+    img.onclick = function () {
+      modal.style.display = "block";
+      modalImg.src = this.src;
+    }
+
+    // Get the <span> element that closes the modal
+    var span = document.getElementsByClassName("close")[0];
+
+    // When the user clicks on <span> (x), close the modal
+    span.onclick = function () {
+      modal.style.display = "none";
+    }
+  }
+</script>
+</html>
